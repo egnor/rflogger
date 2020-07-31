@@ -27,10 +27,25 @@ def main():
             port=args.port, baud=args.baud, debug=args.debug)
         explorer.send_request_config()
 
+        sweeps = 0
+        last_status_time = 0
         print(f'=== Receiving data...')
         while True:
-            if not explorer.poll():
+            now = time.time()
+            if now > last_status_time + 1:
+                last_status_time = now
                 out_file.flush()
+                if explorer.current_config is None:
+                    print(f'{time.strftime("%m-%d %H:%M:%S")} - starting...')
+                else:
+                    cc = explorer.current_config
+                    np = cc.sweep_points
+                    f0 = 1e-6 * cc.start_freq
+                    f1 = 1e-6 * (cc.start_freq + cc.freq_step * (np - 1))
+                    print(f'{time.strftime("%m-%d %H:%M:%S")} - {sweeps:4d}x '
+                          f'({f0:.3f}mHz - {f1:.3f}mHz / {np} points)')
+
+            if not explorer.poll():
                 time.sleep(0.01)
                 continue
 
@@ -43,6 +58,7 @@ def main():
                     print(f'*** Change from {header_freqs} to {freqs}')
                     sys.exit(1)
 
+                sweeps += 1
                 csv_writer.writerow([s.datetime.astimezone().isoformat()] +
                                     list(s.frequency_dbm.values()))
 
